@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payroll Audit Tool — Internal Use Only</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f5f6fa;color:#1a1a2e;font-size:14px;min-height:100vh}
+.topbar{background:#1a1a2e;color:#fff;padding:12px 32px;display:flex;align-items:center;justify-content:space-between}
+.topbar h1{font-size:16px;font-weight:600}
+.topbar span{font-size:12px;color:#aab2c8;background:#ffffff18;padding:4px 10px;border-radius:4px}
+.wrap{max-width:1100px;margin:0 auto;padding:28px 24px}
+.page-title{font-size:22px;font-weight:600;color:#1a1a2e;margin-bottom:4px}
+.page-sub{font-size:13px;color:#666;margin-bottom:24px}
+
+/* Section labels */
+.section-label{font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:#888;margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+.section-label::after{content:'';flex:1;height:1px;background:#e4e7ef}
+.req-label{color:#e53935;font-size:10px;background:#ffebee;padding:2px 6px;border-radius:3px;font-weight:600;letter-spacing:0}
+
+/* Upload cards */
+.upload-grid{display:grid;gap:12px;margin-bottom:4px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:1fr 1fr 1fr}
+.g5{grid-template-columns:1fr 1fr 1fr 1fr 1fr}
+.ucard{background:#fff;border:1px solid #e4e7ef;border-radius:10px;padding:14px}
+.ucard h3{font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.ucard p{font-size:11px;color:#999;margin-bottom:10px;line-height:1.4}
+.vendor-tag{font-size:10px;padding:2px 7px;border-radius:3px;font-weight:600}
+.tag-jiffy{background:#fce4ec;color:#c2185b}
+.tag-refyne{background:#e8f5e9;color:#2e7d32}
+.tag-prosperr{background:#e3f2fd;color:#1565c0}
+.tag-orix{background:#fff3e0;color:#e65100}
+.tag-sundaram{background:#f3e5f5;color:#6a1b9a}
+
+.drop{border:1.5px dashed #c5cbda;border-radius:8px;padding:12px 8px;text-align:center;cursor:pointer;transition:all 0.15s;position:relative;background:#fafbfc}
+.drop:hover,.drop.over{background:#f0f4ff;border-color:#3d5af1}
+.drop.done{border-color:#43a047;border-style:solid;background:#f1f8e9}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-icon{font-size:16px;margin-bottom:4px;color:#ccc}
+.drop-label{font-size:11px;color:#aaa;line-height:1.4}
+.drop.done .drop-label{color:#2e7d32;font-weight:500}
+.drop.done .drop-icon{color:#43a047}
+
+/* Vendor summary badges */
+.vendor-summary{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;margin-bottom:16px}
+.vs-badge{font-size:11px;padding:4px 10px;border-radius:20px;display:flex;align-items:center;gap:5px}
+.vs-badge.loaded{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
+.vs-badge.empty{background:#f5f5f5;color:#bbb;border:1px solid #e0e0e0}
+.vs-dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+
+/* Buttons & form */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 20px;font-size:13px;font-weight:500;border:1px solid #d0d4e4;border-radius:8px;background:#fff;color:#1a1a2e;cursor:pointer;transition:all 0.15s}
+.btn:hover{background:#f0f4ff;border-color:#3d5af1;color:#3d5af1}
+.btn:disabled{opacity:0.4;cursor:not-allowed;pointer-events:none}
+.btn-primary{background:#1a1a2e;color:#fff;border-color:#1a1a2e;font-size:14px;padding:10px 28px}
+.btn-primary:hover{background:#2d2d4e;border-color:#2d2d4e;color:#fff}
+.btn-sm{padding:6px 14px;font-size:12px}
+.rules-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px 24px;margin-bottom:20px}
+.rule-row{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+.rule-row input{width:15px;height:15px;accent-color:#3d5af1;cursor:pointer;flex-shrink:0}
+.status-bar{display:flex;align-items:center;gap:12px;margin-top:4px}
+.status-text{font-size:13px;color:#666}
+
+/* Results */
+.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.metric{background:#fff;border:1px solid #e4e7ef;border-radius:10px;padding:14px 16px}
+.metric .ml{font-size:12px;color:#888;margin-bottom:6px}
+.metric .mv{font-size:26px;font-weight:600;color:#1a1a2e}
+.metric.red .mv{color:#c62828}.metric.amber .mv{color:#e65100}.metric.blue .mv{color:#1565c0}
+
+.filter-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:5px 14px;font-size:12px;font-weight:500;border:1px solid #e4e7ef;border-radius:20px;cursor:pointer;background:#fff;color:#666;transition:all 0.12s}
+.chip:hover{border-color:#3d5af1;color:#3d5af1}
+.chip.active{border-color:#1a1a2e;color:#1a1a2e;background:#f0f4ff}
+.chip .cnt{font-size:11px;padding:1px 7px;border-radius:20px;margin-left:2px}
+.chip-c .cnt{background:#ffebee;color:#c62828}.chip-h .cnt{background:#fff3e0;color:#e65100}
+.chip-m .cnt{background:#e3f2fd;color:#1565c0}.chip-i .cnt{background:#f5f5f5;color:#666}
+.search{padding:7px 12px;font-size:13px;border:1px solid #d0d4e4;border-radius:8px;background:#fff;color:#1a1a2e;width:240px;outline:none}
+.search:focus{border-color:#3d5af1}
+
+.table-wrap{background:#fff;border:1px solid #e4e7ef;border-radius:10px;overflow:hidden;margin-bottom:20px}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+th{text-align:left;padding:10px 14px;border-bottom:1px solid #e4e7ef;color:#888;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;background:#fafbfc}
+td{padding:10px 14px;border-bottom:1px solid #f0f2f8;vertical-align:top;word-break:break-word}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafbff}
+.sev{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:5px}
+.sev-C{background:#ffebee;color:#c62828}.sev-H{background:#fff3e0;color:#e65100}
+.sev-M{background:#e3f2fd;color:#1565c0}.sev-I{background:#f5f5f5;color:#666}
+.mono{font-family:'Courier New',monospace;font-size:12px}
+.empty-state{text-align:center;padding:40px;color:#aaa;font-size:13px}
+
+.ai-box{background:#fff;border:1px solid #e4e7ef;border-radius:10px;padding:20px;margin-bottom:20px}
+.ai-box h3{font-size:14px;font-weight:600;margin-bottom:12px;color:#1a1a2e;display:flex;align-items:center;gap:8px}
+.ai-content{font-size:13px;color:#444;line-height:1.75;white-space:pre-wrap}
+.ai-badge{font-size:11px;background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:4px;font-weight:500}
+.spinner{width:14px;height:14px;border:2px solid #ddd;border-top-color:#3d5af1;border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.back-link{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:#666;cursor:pointer;margin-bottom:16px}
+.back-link:hover{color:#3d5af1}
+.privacy-note{background:#f0f9f0;border:1px solid #a5d6a7;border-radius:8px;padding:10px 14px;font-size:12px;color:#2e7d32;margin-bottom:20px;display:flex;align-items:flex-start;gap:8px}
+
+/* Vendor cross-check info panel */
+.info-panel{background:#fffde7;border:1px solid #ffe082;border-radius:8px;padding:10px 14px;font-size:12px;color:#795548;margin-bottom:12px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>&#9998; Payroll Audit Tool</h1>
+  <span>Internal Use Only — HR &amp; Finance</span>
+</div>
+
+<div class="wrap">
+
+<!-- PHASE 1: UPLOAD -->
+<div id="phase-upload">
+  <div class="page-title">Monthly Pay Register Audit</div>
+  <div class="page-sub">Validate your HGS pay register against Darwinbox and vendor files before salary disbursement</div>
+
+  <div class="privacy-note">
+    &#128274; <div><strong>Data stays on your device.</strong> All parsing and validation runs in your browser. No payroll data is sent to any server. Only an anonymised exception summary is shared with Claude AI for analysis.</div>
+  </div>
+
+  <!-- REQUIRED FILES -->
+  <div class="section-label">Core files <span class="req-label">both required</span></div>
+  <div class="upload-grid g2">
+    <div class="ucard">
+      <h3>Current Month Pay Register</h3>
+      <p>HGS Excel file for the month being validated</p>
+      <div class="drop" id="drop-curr" ondragover="dragOver(event,'drop-curr')" ondragleave="dragLeave('drop-curr')" ondrop="dropFile(event,'curr')" onclick="document.getElementById('f-curr').click()">
+        <input type="file" id="f-curr" accept=".xlsx,.xls" onchange="loadFile(event,'curr')">
+        <div class="drop-icon">&#128196;</div>
+        <div class="drop-label" id="lbl-curr">Click or drag .xlsx here</div>
+      </div>
+    </div>
+    <div class="ucard">
+      <h3>Darwinbox Headcount Export</h3>
+      <p>Master HC report — source of truth for active vs exited employees</p>
+      <div class="drop" id="drop-hc" ondragover="dragOver(event,'drop-hc')" ondragleave="dragLeave('drop-hc')" ondrop="dropFile(event,'hc')" onclick="document.getElementById('f-hc').click()">
+        <input type="file" id="f-hc" accept=".xlsx,.xls,.csv" onchange="loadFile(event,'hc')">
+        <div class="drop-icon">&#128196;</div>
+        <div class="drop-label" id="lbl-hc">Click or drag .xlsx / .csv here</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PREV MONTH -->
+  <div class="section-label">Month-on-month comparison <span style="font-size:10px;color:#aaa;letter-spacing:0;text-transform:none;font-weight:400">optional — enables MoM anomaly checks</span></div>
+  <div class="upload-grid g2">
+    <div class="ucard">
+      <h3>Previous Month Pay Register</h3>
+      <p>Last month's HGS final register. Enables gross/basic change detection and new joiner / leaver flags.</p>
+      <div class="drop" id="drop-prev" ondragover="dragOver(event,'drop-prev')" ondragleave="dragLeave('drop-prev')" ondrop="dropFile(event,'prev')" onclick="document.getElementById('f-prev').click()">
+        <input type="file" id="f-prev" accept=".xlsx,.xls" onchange="loadFile(event,'prev')">
+        <div class="drop-icon">&#128196;</div>
+        <div class="drop-label" id="lbl-prev">Click or drag here</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;padding:0 16px">
+      <p style="font-size:12px;color:#aaa;line-height:1.6">When uploaded, the tool will flag employees whose gross pay changed by more than 15%, employees whose basic changed at all, new joiners, and employees who left the register.</p>
+    </div>
+  </div>
+
+  <!-- FLEXI VENDORS -->
+  <div class="section-label">Flexi benefit vendors <span style="font-size:10px;color:#aaa;letter-spacing:0;text-transform:none;font-weight:400">optional — upload whichever you received this month</span></div>
+
+  <div class="info-panel">
+    &#128161; Upload any combination — Jiffy only, Refyne + Prosperr, all three, or none. The tool will cross-check each uploaded vendor's amounts against the corresponding reimbursement columns in the pay register. Vendors you skip will simply not be cross-checked.
+  </div>
+
+  <div class="upload-grid g3">
+    <div class="ucard">
+      <h3><span class="vendor-tag tag-jiffy">Jiffy</span></h3>
+      <p>Upload this month's Jiffy reimbursement export. The tool will match employees by ID and flag discrepancies vs the pay register.</p>
+      <div class="drop" id="drop-jiffy" ondragover="dragOver(event,'drop-jiffy')" ondragleave="dragLeave('drop-jiffy')" ondrop="dropFile(event,'jiffy')" onclick="document.getElementById('f-jiffy').click()">
+        <input type="file" id="f-jiffy" accept=".xlsx,.xls,.csv" onchange="loadFile(event,'jiffy')">
+        <div class="drop-icon">&#128196;</div>
+        <div class="drop-label" id="lbl-jiffy">Click or drag here</div>
+      </div>
+    </div>
+    <div class="ucard">
+      <h3><span class="vendor-tag tag-refyne">Refyne</span></h3>
+      <p>Upload this month's Refyne reimbursement export. Can be uploaded alone even if Jiffy and Prosperr are skipped.</p>
+      <div class="drop" id="drop-refyne" ondragover="dragOver(event,'drop-refyne')" ondragleave="dragLeave('drop-refyne')" ondrop="dropFile(event,'refyne')" onclick="document.getElementById('f-refyne').click()">
+        <input type="file" id="f-refyne" accept=".xlsx,.xls,.csv" onchange="loadFile(event,'refyne')">
+        <div class="drop-icon">&#128196;</div>
+        <div class="drop-label" id="lbl-refyne">Click or drag here</div>
+      </div>
+    </div>
+    <div class="ucard">
+      <h3><span class="vendor-tag tag-prosperr">Prosperr</span></h3>
+      <p>Upload this month's Prosperr reimbursement export. Can be uploaded alone even if Jiffy and Refyne are skipped.</p>
+      <div class="drop" id="drop-prosperr" ondragover="dragOver(event,'drop-prosperr')" ondragleave="dragLeave('drop-prosperr')" ondrop="dropFile(event,'prosperr')" onclick="document.getElementById('f-prosperr').click()">
+        <input type="file" id="f-prosperr" accept=".xlsx,.xls,.csv" onchange="loadFile(event,'prosperr')">
+        <div class="drop-icon">&#128196;</div>
+        <div class="drop-label" id="lbl-prosperr">Click or drag here</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vendor upload status pills -->
+  <div class="vendor-summary" id="flexi-summary">
+    <div class="vs-badge empty" id="vs-jiffy"><div class="vs-dot"></div> Jiffy — not uploaded</div>
+    <div class="vs-badge empty" id="vs-refyne"><div class="vs-dot"></div> Refyne — not uploaded</div>
+    <div class="vs-badge empty" id="vs-prosperr"><div class="vs-dot"></div> Prosperr — not uploaded</div>
+  </div>
+
+  <!-- CAR LEASE VENDORS -->
+  <div class="section-label">Car lease vendors <span style="font-size:10px;color:#aaa;letter-spacing:0;text-transform:none;font-weight:400">optional — upload whichever applies this month</span></div>
+
+  <div class="upload-grid g2">
+    <div class="ucard">
+      <h3><span class="vendor-tag tag-orix">Orix</span></h3>
+      <p>Upload Orix monthly deduction report. The tool will cross-check CAR LEASE RENTAL deductions per employee against what Orix reports.</p>
+      <div class="drop" id="drop-orix" ondragover="dragOver(event,'drop-orix')" ondragleave="dragLeave('drop-orix')" ondrop="dropFile(event,'orix')" onclick="document.getElementById('f-orix').click()">
+        <input type="file" id="f-orix" accept=".xlsx,.xls,.csv" onchange="loadFile(event,'orix')">
+        <div class="drop-icon">&#128196;</div>
+        <div class="drop-label" id="lbl-orix">Click or drag here</div>
+      </div>
+    </div>
+    <div class="ucard">
+      <h3><span class="vendor-tag tag-sundaram">Sundaram</span></h3>
+      <p>Upload Sundaram monthly deduction report. Can be uploaded alongside or independent of Orix — both are checked separately.</p>
+      <div class="drop" id="drop-sundaram" ondragover="dragOver(event,'drop-sundaram')" ondragleave="dragLeave('drop-sundaram')" ondrop="dropFile(event,'sundaram')" onclick="document.getElementById('f-sundaram').click()">
+        <input type="file" id="f-sundaram" accept=".xlsx,.xls,.csv" onchange="loadFile(event,'sundaram')">
+        <div class="drop-icon">&#128196;</div>
+        <div class="drop-label" id="lbl-sundaram">Click or drag here</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="vendor-summary" id="car-summary">
+    <div class="vs-badge empty" id="vs-orix"><div class="vs-dot"></div> Orix — not uploaded</div>
+    <div class="vs-badge empty" id="vs-sundaram"><div class="vs-dot"></div> Sundaram — not uploaded</div>
+  </div>
+
+  <!-- RULES -->
+  <div class="section-label">Validation rules</div>
+  <div class="rules-grid">
+    <label class="rule-row"><input type="checkbox" id="r-pf" checked> PF amount (₹1,800 or 12% of basic)</label>
+    <label class="rule-row"><input type="checkbox" id="r-pt" checked> Profession Tax by state</label>
+    <label class="rule-row"><input type="checkbox" id="r-gross" checked> Gross = sum of components</label>
+    <label class="rule-row"><input type="checkbox" id="r-hc" checked> Headcount vs Darwinbox</label>
+    <label class="rule-row"><input type="checkbox" id="r-neg" checked> Negative salary / deduction values</label>
+    <label class="rule-row"><input type="checkbox" id="r-missing" checked> Missing PAN / UAN / Bank details</label>
+    <label class="rule-row"><input type="checkbox" id="r-mom" checked> Month-on-month anomalies (&gt;15%)</label>
+    <label class="rule-row"><input type="checkbox" id="r-hold" checked> Hold salary listing (HELDBACKED)</label>
+    <label class="rule-row"><input type="checkbox" id="r-vendor" checked> Vendor cross-check (flexi + car lease)</label>
+  </div>
+
+  <div class="status-bar">
+    <button class="btn btn-primary" id="run-btn" onclick="runAudit()" disabled>&#9654; Run Audit</button>
+    <span class="status-text" id="upload-status">Upload current month register + Darwinbox HC to begin</span>
+  </div>
+</div>
+
+<!-- PHASE 2: RESULTS -->
+<div id="phase-results" style="display:none">
+  <a class="back-link" onclick="showUpload()">&#8592; Upload new files</a>
+  <div class="page-title" id="res-title">Audit Results</div>
+  <div class="page-sub" id="res-sub"></div>
+  <div id="vendor-used" style="margin-bottom:16px"></div>
+
+  <div class="metric-grid" id="metrics"></div>
+
+  <div class="filter-row">
+    <div id="filter-chips" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    <input class="search" type="text" placeholder="Search employee or check..." oninput="renderTable()" id="q">
+    <button class="btn btn-sm" onclick="exportXlsx()">&#8659; Export Excel</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <colgroup>
+        <col style="width:90px"><col style="width:150px"><col style="width:155px">
+        <col style="width:auto"><col style="width:90px"><col style="width:110px">
+      </colgroup>
+      <thead>
+        <tr><th>Emp ID</th><th>Name</th><th>Check</th><th>Finding</th><th>Severity</th><th style="text-align:right">Amount</th></tr>
+      </thead>
+      <tbody id="exc-body"></tbody>
+    </table>
+  </div>
+
+  <div class="ai-box">
+    <h3>AI Analysis <span class="ai-badge" id="ai-badge" style="display:none">Claude</span> <span class="spinner" id="ai-spin"></span></h3>
+    <div class="ai-content" id="ai-text">Analysing exceptions with Claude AI...</div>
+  </div>
+</div>
+
+</div>
+
+<script>
+/* ---- State ---- */
+const F = {
+  curr:null, hc:null, prev:null,
+  jiffy:null, refyne:null, prosperr:null,
+  orix:null, sundaram:null
+};
+let ALL=[], ACTIVE='all';
+
+/* ---- File handling ---- */
+function dragOver(e,id){e.preventDefault();document.getElementById(id).classList.add('over')}
+function dragLeave(id){document.getElementById(id).classList.remove('over')}
+function dropFile(e,k){e.preventDefault();dragLeave('drop-'+k);const f=e.dataTransfer.files[0];if(f)processFile(f,k)}
+function loadFile(e,k){const f=e.target.files[0];if(f)processFile(f,k)}
+
+function processFile(f,k){
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const data=XLSX.utils.sheet_to_json(ws,{defval:''});
+      F[k]={name:f.name,data};
+      const lbl=document.getElementById('lbl-'+k);
+      if(lbl)lbl.textContent=f.name+' ('+data.length+' rows)';
+      const drop=document.getElementById('drop-'+k);
+      if(drop)drop.classList.add('done');
+      // Update vendor status pills
+      const vs=document.getElementById('vs-'+k);
+      if(vs){vs.className='vs-badge loaded';vs.innerHTML='<div class="vs-dot"></div> '+k.charAt(0).toUpperCase()+k.slice(1)+' — '+data.length+' rows';}
+      checkReady();
+    }catch(e){alert('Could not read: '+f.name+'\n'+e.message)}
+  };
+  r.readAsArrayBuffer(f);
+}
+
+function checkReady(){
+  const ok=!!(F.curr&&F.hc);
+  document.getElementById('run-btn').disabled=!ok;
+  const vendors=['jiffy','refyne','prosperr','orix','sundaram'].filter(k=>F[k]).map(k=>k.charAt(0).toUpperCase()+k.slice(1));
+  let msg=ok?'Ready':'Upload current month register + Darwinbox HC to begin';
+  if(ok&&vendors.length)msg='Ready — '+vendors.join(', ')+' vendor file'+(vendors.length>1?'s':'')+' also loaded';
+  document.getElementById('upload-status').textContent=msg;
+}
+
+function showUpload(){
+  document.getElementById('phase-upload').style.display='';
+  document.getElementById('phase-results').style.display='none';
+}
+
+/* ---- Column helpers ---- */
+function col(hdr,terms){
+  for(const t of terms){const k=hdr.find(h=>h&&h.toString().toUpperCase().includes(t.toUpperCase()));if(k)return k;}
+  return null;
+}
+function N(row,c){if(!c||row[c]===undefined||row[c]==='')return 0;return parseFloat(row[c])||0}
+function S(row,c){if(!c)return '';return(row[c]||'').toString().trim()}
+
+function mapPay(data){
+  if(!data||!data.length)return {};
+  const h=Object.keys(data[0]);
+  return{
+    empno:col(h,['EMPNO']),refno:col(h,['REF_EMPLOYEE','REF EMPLOYEE']),
+    name:col(h,['EMPLOYEE NAME','FULL NAME']),state:col(h,['STATE NAME','STATE']),
+    paymode:col(h,['PAYMENT MODE','PAY MODE']),basic:col(h,['BASIC']),hra:col(h,['HRA']),
+    lta:col(h,['LTA']),sp:col(h,['SPECIAL ALLOWANCE']),telr:col(h,['TELEPHONE REIMBURSEMENT']),
+    meal:col(h,['MEAL & GIFT']),veh:col(h,['VEHICLE']),books:col(h,['BOOKS']),
+    stipend:col(h,['STIPEND']),car:col(h,['CAR LEASE']),teltax:col(h,['TELEPHONE ALLOWANCE TAX']),
+    conv:col(h,['CONVEYANCE']),fitness:col(h,['FITNESS']),mob:col(h,['MOBILE ALLOWANCE']),
+    compoff:col(h,['COMP-OFF','COMP OFF']),joinbonus:col(h,['JOINING BONUS']),
+    otbonus:col(h,['ONE TIME BONUS']),inc:col(h,['INCENTIVE']),ref:col(h,['REFERRAL']),
+    gross:col(h,['GROSS']),pf:col(h,['P.F.','PF']),vpf:col(h,['V.P.F.','VPF']),
+    tds:col(h,['INCOME TAX','TDS']),pt:col(h,['PROFESSION TAX','PT']),
+    lwf:col(h,['LABOUR WELFARE','LWF']),pan:col(h,['PAN NO','PAN']),
+    uan:col(h,['UAN']),bank:col(h,['BANK ACCOUNT','ACCOUNT NO'])
+  };
+}
+
+function mapHC(data){
+  if(!data||!data.length)return {};
+  const h=Object.keys(data[0]);
+  return{empid:col(h,['EMPLOYEE ID','EMP ID','EMPID']),name:col(h,['FULL NAME','NAME']),doexit:col(h,['DATE OF EXIT','EXIT DATE'])};
+}
+
+/* ---- Vendor file mapper ---- */
+/* Builds a map of {normalised_emp_id -> total_amount} from any vendor file.
+   Tries multiple common column name patterns for both ID and amount. */
+function buildVendorMap(data, vendorName) {
+  if(!data||!data.length) return {map:{}, idCol:null, amtCol:null, vendorName};
+  const h = Object.keys(data[0]);
+
+  // Try to find employee ID column
+  const idCol = col(h, ['EMPLOYEE ID','EMP ID','EMPNO','REF_EMPLOYEE','EMP NO','EMPID','STAFF ID','STAFF NO']);
+
+  // Try to find amount column — ordered by specificity
+  const amtCol = col(h, [
+    'REIMBURSEMENT AMOUNT','REIMBURSEMENT','CLAIM AMOUNT','CLAIM',
+    'NET AMOUNT','NET PAYABLE','PAYABLE AMOUNT','PAYABLE',
+    'TOTAL AMOUNT','TOTAL','DEDUCTION AMOUNT','DEDUCTION',
+    'AMOUNT','AMT'
+  ]);
+
+  const map = {};
+  if(idCol && amtCol){
+    data.forEach(row => {
+      const id = S(row, idCol).toUpperCase();
+      const amt = N(row, amtCol);
+      if(id) map[id] = (map[id]||0) + amt;
+    });
+  }
+  return {map, idCol, amtCol, vendorName, rows: data.length};
+}
+
+const PT={KARNATAKA:200,MAHARASHTRA:200,'WEST BENGAL':200,HARYANA:34,TELANGANA:200,GUJARAT:200,'ANDHRA PRADESH':200};
+
+function exc(list,id,nm,chk,msg,sev,amt){
+  list.push({id:id||'—',nm:(nm||'').substring(0,28),chk,msg,sev,amt:amt!==undefined?amt:''});
+}
+function fmt(n){return Math.round(n).toLocaleString('en-IN')}
+
+/* ---- Main audit ---- */
+function runAudit(){
+  const C=mapPay(F.curr.data);
+  const HC=mapHC(F.hc.data);
+  const R={
+    pf:chk('r-pf'),pt:chk('r-pt'),gross:chk('r-gross'),hc:chk('r-hc'),
+    neg:chk('r-neg'),missing:chk('r-missing'),mom:chk('r-mom'),
+    hold:chk('r-hold'),vendor:chk('r-vendor')
+  };
+  function chk(id){return document.getElementById(id).checked}
+
+  const rows=F.curr.data;
+  const earns=[C.basic,C.hra,C.lta,C.sp,C.telr,C.meal,C.veh,C.books,C.stipend,C.car,C.teltax,C.conv,C.fitness,C.mob,C.compoff,C.joinbonus,C.otbonus,C.inc,C.ref].filter(Boolean);
+  const excs=[], seen={}, payIds=new Set();
+
+  /* --- Standard row-level checks --- */
+  rows.forEach(row=>{
+    const id=S(row,C.empno), ref=S(row,C.refno), nm=S(row,C.name);
+    const basic=N(row,C.basic), gross=N(row,C.gross), pf=N(row,C.pf), pt=N(row,C.pt);
+    const state=S(row,C.state).toUpperCase(), pm=S(row,C.paymode).toUpperCase();
+    if(ref)payIds.add(ref.toUpperCase());
+
+    if(R.hold&&pm==='HELDBACKED')exc(excs,id,nm,'Hold Salary','Payment marked HELDBACKED — confirm intentional','M','');
+
+    if(R.neg){
+      if(gross<0)exc(excs,id,nm,'Negative Gross','Gross is ₹'+fmt(gross),'C',gross);
+      if(basic<0)exc(excs,id,nm,'Negative Basic','Basic is ₹'+fmt(basic),'C',basic);
+    }
+
+    if(id){if(seen[id]){exc(excs,id,nm,'Duplicate ID','Employee ID appears more than once','C','')}seen[id]=true;}
+
+    if(R.pf&&pf>0&&basic>0){
+      const ok1=Math.abs(pf-1800)<10, ok2=Math.abs(pf-Math.round(basic*0.12))<10;
+      if(!ok1&&!ok2)exc(excs,id,nm,'PF Mismatch','PF ₹'+fmt(pf)+' ≠ ₹1,800 nor 12% of Basic (₹'+fmt(Math.round(basic*0.12))+')','C',pf);
+    }
+
+    if(R.pt){
+      const exp=PT[state];
+      if(exp!==undefined&&Math.abs(pt-exp)>1)exc(excs,id,nm,'PT Error','PT ₹'+pt+' — expected ₹'+exp+' for '+state,'H',pt);
+    }
+
+    if(R.gross&&gross>0){
+      let s=0;earns.forEach(k=>{s+=N(row,k)});
+      const diff=Math.abs(s-gross);
+      if(diff>5)exc(excs,id,nm,'Gross Mismatch','Components ₹'+fmt(Math.round(s))+' ≠ Gross ₹'+fmt(gross)+' (diff ₹'+Math.round(diff)+')','C',gross);
+    }
+
+    if(R.missing){
+      const pan=S(row,C.pan),uan=S(row,C.uan),bank=S(row,C.bank);
+      if(!pan||pan.length<10)exc(excs,id,nm,'Missing PAN','PAN not populated or invalid','H','');
+      if(!uan||uan.length<10)exc(excs,id,nm,'Missing UAN','UAN not populated or invalid','H','');
+      if(!bank||bank.length<5)exc(excs,id,nm,'Missing Bank A/C','Bank account missing','H','');
+    }
+
+    if(N(row,C.joinbonus)>0)exc(excs,id,nm,'Joining Bonus','₹'+fmt(N(row,C.joinbonus))+' — verify approval','I',N(row,C.joinbonus));
+    if(N(row,C.inc)>0)exc(excs,id,nm,'Incentive','₹'+fmt(N(row,C.inc))+' — verify HRBP input','I',N(row,C.inc));
+  });
+
+  /* --- Darwinbox headcount check --- */
+  if(R.hc&&HC.empid){
+    const active=new Set(), exited=new Set();
+    F.hc.data.forEach(hr=>{
+      const id=(S(hr,HC.empid)||'').toUpperCase();if(!id)return;
+      const ex=(hr[HC.doexit]||'').toString().trim();
+      if(!ex||ex===' ')active.add(id);else exited.add(id);
+    });
+    rows.forEach(row=>{
+      const ref=(S(row,C.refno)||'').toUpperCase(),id=S(row,C.empno),nm=S(row,C.name);
+      if(!ref)return;
+      if(exited.has(ref))exc(excs,id,nm,'Exited in Darwinbox','Has exit date in Darwinbox but on active register — should be FNF only','C','');
+      else if(!active.has(ref))exc(excs,id,nm,'Not in Darwinbox','Employee ID not found in Darwinbox HC','H','');
+    });
+    active.forEach(id=>{
+      if(!payIds.has(id)){
+        const hr=F.hc.data.find(r=>(S(r,HC.empid)||'').toUpperCase()===id);
+        exc(excs,'—',hr?S(hr,HC.name):'','Missing from Payroll','Active in Darwinbox but absent from pay register','H','');
+      }
+    });
+  }
+
+  /* --- MoM check --- */
+  if(R.mom&&F.prev){
+    const PC=mapPay(F.prev.data),pm={};
+    F.prev.data.forEach(r=>{const ref=S(r,PC.refno)||S(r,PC.empno);if(ref)pm[ref.toUpperCase()]={g:N(r,PC.gross),b:N(r,PC.basic)}});
+    rows.forEach(row=>{
+      const ref=(S(row,C.refno)||S(row,C.empno)||'').toUpperCase();
+      const id=S(row,C.empno),nm=S(row,C.name),cg=N(row,C.gross),cb=N(row,C.basic);
+      if(!pm[ref]){exc(excs,id,nm,'New Joiner','Not in previous month register','I','');return;}
+      const p=pm[ref];
+      if(p.g>0){const ch=Math.abs(cg-p.g)/p.g;if(ch>0.15)exc(excs,id,nm,'MoM Gross Spike',Math.round(ch*100)+'% change — ₹'+fmt(p.g)+' → ₹'+fmt(cg),'H',cg);}
+      if(p.b>0&&Math.abs(cb-p.b)>1)exc(excs,id,nm,'Basic Changed','₹'+fmt(p.b)+' → ₹'+fmt(cb),'M',cb);
+    });
+    F.prev.data.forEach(r=>{
+      const ref=(S(r,PC.refno)||S(r,PC.empno)||'').toUpperCase(),nm=S(r,PC.name);
+      if(ref&&!payIds.has(ref))exc(excs,'—',nm,'Left Register','In last month but absent now — confirm FNF register','M','');
+    });
+  }
+
+  /* --- Vendor cross-checks --- */
+  if(R.vendor){
+    /* Build a lookup from the pay register: refno -> {row, all columns} */
+    const payLookup = {};
+    rows.forEach(row => {
+      const ref = (S(row,C.refno)||S(row,C.empno)||'').toUpperCase();
+      if(ref) payLookup[ref] = row;
+    });
+
+    /* --- Flexi vendors: Jiffy, Refyne, Prosperr ---
+       Each vendor's amounts should match the sum of flexi reimbursement columns
+       in the pay register for that employee.
+       We check each vendor independently and flag discrepancies. */
+    const flexiVendors = ['jiffy','refyne','prosperr'].filter(k=>F[k]);
+    const flexiPayCols = [C.meal,C.fitness,C.books,C.conv,C.mob,C.telr,C.veh].filter(Boolean);
+
+    flexiVendors.forEach(vk => {
+      const {map, idCol, amtCol, vendorName} = buildVendorMap(F[vk].data, vk.charAt(0).toUpperCase()+vk.slice(1));
+
+      if(!idCol || !amtCol){
+        // Could not auto-detect columns — flag as a data issue
+        exc(excs,'—','','Vendor Col Error','Could not detect Employee ID or Amount columns in '+vk.charAt(0).toUpperCase()+vk.slice(1)+' file — please check the column headers','M','');
+        return;
+      }
+
+      // Cross-check each vendor employee against pay register
+      Object.entries(map).forEach(([vid, vAmt]) => {
+        const payRow = payLookup[vid];
+        if(!payRow){
+          exc(excs,vid,'','Vendor-Only Employee',vk.charAt(0).toUpperCase()+vk.slice(1)+': employee in vendor file but not found in pay register','H',vAmt);
+          return;
+        }
+        // Sum all flexi columns in pay register for this employee
+        const payFlexi = flexiPayCols.reduce((s,c)=>s+N(payRow,c),0);
+        const diff = Math.abs(vAmt - payFlexi);
+        // Allow ±₹100 tolerance for rounding
+        if(diff > 100){
+          exc(excs, S(payRow,C.empno), S(payRow,C.name),
+            vk.charAt(0).toUpperCase()+vk.slice(1)+' Mismatch',
+            'Vendor amount ₹'+fmt(vAmt)+' vs pay register flexi total ₹'+fmt(payFlexi)+' (diff ₹'+fmt(diff)+')',
+            'H', vAmt);
+        }
+      });
+
+      // Also check employees in pay register with flexi amounts but missing from vendor file
+      rows.forEach(row => {
+        const ref = (S(row,C.refno)||S(row,C.empno)||'').toUpperCase();
+        const payFlexi = flexiPayCols.reduce((s,c)=>s+N(row,c),0);
+        if(payFlexi>100 && !map[ref]){
+          exc(excs, S(row,C.empno), S(row,C.name),
+            vk.charAt(0).toUpperCase()+vk.slice(1)+' — Not in vendor',
+            'Pay register shows ₹'+fmt(payFlexi)+' flexi reimbursement but employee absent from '+vk.charAt(0).toUpperCase()+vk.slice(1)+' file',
+            'M', payFlexi);
+        }
+      });
+    });
+
+    /* --- Car lease vendors: Orix, Sundaram ---
+       Cross-check CAR LEASE RENTAL column against vendor deduction per employee. */
+    const carVendors = ['orix','sundaram'].filter(k=>F[k]);
+    carVendors.forEach(vk => {
+      const {map, idCol, amtCol} = buildVendorMap(F[vk].data, vk.charAt(0).toUpperCase()+vk.slice(1));
+
+      if(!idCol||!amtCol){
+        exc(excs,'—','','Vendor Col Error','Could not detect Employee ID or Amount columns in '+vk.charAt(0).toUpperCase()+vk.slice(1)+' file — please check column headers','M','');
+        return;
+      }
+
+      Object.entries(map).forEach(([vid, vAmt]) => {
+        const payRow = payLookup[vid];
+        if(!payRow){
+          exc(excs,vid,'','Vendor-Only Employee',vk.charAt(0).toUpperCase()+vk.slice(1)+': employee in vendor file but not found in pay register','H',vAmt);
+          return;
+        }
+        const payCarLease = N(payRow, C.car);
+        const diff = Math.abs(vAmt - payCarLease);
+        if(diff > 50){
+          exc(excs, S(payRow,C.empno), S(payRow,C.name),
+            vk.charAt(0).toUpperCase()+vk.slice(1)+' Car Lease Mismatch',
+            'Vendor amount ₹'+fmt(vAmt)+' vs CAR LEASE RENTAL in register ₹'+fmt(payCarLease)+' (diff ₹'+fmt(diff)+')',
+            'H', vAmt);
+        }
+      });
+
+      rows.forEach(row => {
+        const ref = (S(row,C.refno)||S(row,C.empno)||'').toUpperCase();
+        const payLease = N(row, C.car);
+        if(payLease > 50 && !map[ref]){
+          exc(excs, S(row,C.empno), S(row,C.name),
+            vk.charAt(0).toUpperCase()+vk.slice(1)+' — Not in vendor',
+            'Pay register shows car lease ₹'+fmt(payLease)+' but employee absent from '+vk.charAt(0).toUpperCase()+vk.slice(1)+' file',
+            'M', payLease);
+        }
+      });
+    });
+  }
+
+  ALL = excs;
+  showResults();
+  aiAnalyse(excs);
+}
+
+/* ---- Results display ---- */
+function showResults(){
+  document.getElementById('phase-upload').style.display='none';
+  document.getElementById('phase-results').style.display='';
+  const cnt={C:0,H:0,M:0,I:0};
+  ALL.forEach(e=>cnt[e.sev]=(cnt[e.sev]||0)+1);
+  const total=ALL.length, emp=F.curr.data.length;
+
+  document.getElementById('res-title').textContent='Audit Results — '+F.curr.name;
+  document.getElementById('res-sub').textContent='Checked '+emp+' employees. '+total+' exceptions found.';
+
+  // Vendor badges
+  const loadedVendors=['jiffy','refyne','prosperr','orix','sundaram'].filter(k=>F[k]);
+  const vendorColors={jiffy:'#fce4ec;color:#c2185b',refyne:'#e8f5e9;color:#2e7d32',prosperr:'#e3f2fd;color:#1565c0',orix:'#fff3e0;color:#e65100',sundaram:'#f3e5f5;color:#6a1b9a'};
+  document.getElementById('vendor-used').innerHTML=loadedVendors.length?
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;color:#888">Vendor files used:</span>'+
+    loadedVendors.map(k=>`<span style="font-size:11px;padding:3px 10px;border-radius:4px;font-weight:600;background:${vendorColors[k].split(';')[0].split(':')[1]};color:${vendorColors[k].split(';')[1].split(':')[1]}">${k.charAt(0).toUpperCase()+k.slice(1)}</span>`).join('')+'</div>':'';
+
+  document.getElementById('metrics').innerHTML=
+    '<div class="metric"><div class="ml">Employees checked</div><div class="mv">'+emp+'</div></div>'+
+    '<div class="metric red"><div class="ml">Critical</div><div class="mv">'+cnt.C+'</div></div>'+
+    '<div class="metric amber"><div class="ml">High</div><div class="mv">'+cnt.H+'</div></div>'+
+    '<div class="metric blue"><div class="ml">Medium + Info</div><div class="mv">'+((cnt.M||0)+(cnt.I||0))+'</div></div>';
+
+  document.getElementById('filter-chips').innerHTML=
+    '<div class="chip active" data-f="all" onclick="setFilter(\'all\',this)">All <span class="cnt">'+total+'</span></div>'+
+    '<div class="chip chip-c" data-f="C" onclick="setFilter(\'C\',this)">Critical <span class="cnt">'+cnt.C+'</span></div>'+
+    '<div class="chip chip-h" data-f="H" onclick="setFilter(\'H\',this)">High <span class="cnt">'+cnt.H+'</span></div>'+
+    '<div class="chip chip-m" data-f="M" onclick="setFilter(\'M\',this)">Medium <span class="cnt">'+cnt.M+'</span></div>'+
+    '<div class="chip chip-i" data-f="I" onclick="setFilter(\'I\',this)">Info <span class="cnt">'+cnt.I+'</span></div>';
+
+  ACTIVE='all';
+  renderTable();
+}
+
+function sevLabel(s){return{C:'Critical',H:'High',M:'Medium',I:'Info'}[s]||s}
+
+function setFilter(f,el){
+  ACTIVE=f;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  renderTable();
+}
+
+function renderTable(){
+  const q=(document.getElementById('q').value||'').toLowerCase();
+  const rows=ALL.filter(e=>{
+    if(ACTIVE!=='all'&&e.sev!==ACTIVE)return false;
+    if(q&&!(e.id+e.nm+e.chk+e.msg).toLowerCase().includes(q))return false;
+    return true;
+  });
+  const body=document.getElementById('exc-body');
+  if(!rows.length){body.innerHTML='<tr><td colspan="6" class="empty-state">No exceptions match this filter</td></tr>';return;}
+  body.innerHTML=rows.map(e=>`<tr>
+    <td class="mono">${e.id}</td>
+    <td>${e.nm}</td>
+    <td><strong>${e.chk}</strong></td>
+    <td style="color:#555">${e.msg}</td>
+    <td><span class="sev sev-${e.sev}">${sevLabel(e.sev)}</span></td>
+    <td class="mono" style="text-align:right">${e.amt!==''?'₹'+fmt(parseFloat(e.amt)||0):''}</td>
+  </tr>`).join('');
+}
+
+function exportXlsx(){
+  const ws=XLSX.utils.json_to_sheet(ALL.map(e=>({'Emp ID':e.id,'Name':e.nm,'Check':e.chk,'Finding':e.msg,'Severity':sevLabel(e.sev),'Amount':e.amt})));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Exceptions');
+  XLSX.writeFile(wb,'payroll_exceptions_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+async function aiAnalyse(excs){
+  document.getElementById('ai-spin').style.display='';
+  document.getElementById('ai-badge').style.display='none';
+  const cnt={C:0,H:0,M:0,I:0};
+  excs.forEach(e=>cnt[e.sev]=(cnt[e.sev]||0)+1);
+  const top=excs.filter(e=>e.sev==='C'||e.sev==='H').slice(0,15)
+    .map(e=>`- [${sevLabel(e.sev)}] ${e.chk}: ${e.msg} (Emp: ${e.id})`).join('\n');
+  const vendors=['jiffy','refyne','prosperr','orix','sundaram'].filter(k=>F[k]).map(k=>k.charAt(0).toUpperCase()+k.slice(1));
+  const prompt=`You are a payroll audit assistant for an Indian company. Exception summary from this month's audit:
+
+Employees checked: ${F.curr.data.length}
+Critical: ${cnt.C} | High: ${cnt.H} | Medium: ${cnt.M} | Info: ${cnt.I}
+Vendor files used: ${vendors.length?vendors.join(', '):'None'}
+
+Top exceptions:
+${top||'None in Critical/High'}
+
+Write 3 short, specific paragraphs:
+1. What must be fixed before salary disbursement (Critical items only)
+2. Notable patterns in High/Medium items — especially any vendor cross-check mismatches if present
+3. Concrete next steps for the payroll team before final approval to HGS
+
+Be direct. No generic advice. Use ₹ for currency.`;
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,messages:[{role:'user',content:prompt}]})});
+    const d=await res.json();
+    const txt=d.content&&d.content[0]?d.content[0].text:'Analysis unavailable.';
+    document.getElementById('ai-text').textContent=txt;
+    document.getElementById('ai-badge').style.display='';
+  }catch(e){
+    document.getElementById('ai-text').textContent='AI analysis unavailable — check your internet connection.';
+  }
+  document.getElementById('ai-spin').style.display='none';
+}
+</script>
+</body>
+</html>
