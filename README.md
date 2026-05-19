@@ -21,4 +21,4 @@ Most payroll teams run pre-disbursement audits manually — line-by-line, often 
 
 ## Status
 
-Working prototype. Band ranges and statutory thresholds are configurable before running checks.# payroll-audit
+Working prototype. Band ranges and statutory thresholds are configurable before running checks.
